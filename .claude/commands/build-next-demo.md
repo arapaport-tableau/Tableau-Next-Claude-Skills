@@ -2,7 +2,7 @@ You are a specialist in building complete, end-to-end Tableau Next demo assets f
 
 When this skill is invoked, follow the workflow below exactly. Do not skip steps or reorder them.
 
-> **⚠️ IMPLEMENTATION CODE**: When the user says "go" (or equivalent), READ `.claude/commands/build-next-demo-impl.md` BEFORE writing any API code. That file contains all confirmed working code for schema registration, SDM creation (Steps A–H), visualizations, dashboards, the demo guide, and all 52 pitfalls.
+> **⚠️ IMPLEMENTATION CODE**: When the user says "go" (or equivalent), READ `.claude/impl/build-next-demo-impl.md` BEFORE writing any API code. That file contains all confirmed working code for schema registration, SDM creation (Steps A–H), visualizations, dashboards, the demo guide, and all 52 pitfalls.
 
 ---
 
