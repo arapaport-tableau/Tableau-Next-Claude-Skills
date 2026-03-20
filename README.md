@@ -20,35 +20,23 @@ You describe the prospect, the persona, and the story. Claude builds the workspa
 
 ## One-Time Setup
 
-### 1 — Install Python dependencies
-
-```bash
-pip3 install -r requirements.txt
-```
-
-### 2 — Run the setup script
-
-```bash
-python3 next_setup.py
-```
-
-The script walks you through creating a Salesforce Connected App and an IngestAPI connector, then saves your credentials to `next_config.json`. Takes about 10–15 minutes the first time.
-
-**You only run setup once per Salesforce org.**
-
-> `next_config.json` contains your credentials — never share it or commit it. It's excluded from this repo by `.gitignore`.
-
-For a detailed step-by-step version (including screenshots and manual credential steps), see [PEER_SETUP.md](PEER_SETUP.md).
-
----
-
-## Open This Folder in Claude Code
+### 1 — Open this folder in Claude Code
 
 1. Open VS Code
 2. **File → Open Folder** → select this folder
 3. Click the **Claude Code** icon in the bottom status bar
 
-Type **hi** in the Claude panel to confirm everything is working.
+### 2 — Ask Claude to set you up
+
+Type this in the Claude panel:
+
+> "Walk me through setup"
+
+Claude will guide you through everything interactively — creating a Connected App, configuring credentials, and verifying your connection. **You do not need to follow PEER_SETUP.md manually.** Claude handles it step by step and will ask for your input only when needed.
+
+**You only run setup once per Salesforce org.**
+
+> `next_config.json` contains your credentials — never share it or commit it. It's excluded from this repo by `.gitignore`.
 
 ---
 
@@ -98,6 +86,8 @@ It lists every demo you've built and walks you through the cleanup.
 
 ## Troubleshooting
 
+If something goes wrong, paste the error into Claude and ask — it can diagnose and fix most issues on the fly.
+
 | Problem | Fix |
 |---|---|
 | `ModuleNotFoundError` | Run `pip3 install -r requirements.txt` and try again |
@@ -106,4 +96,3 @@ It lists every demo you've built and walks you through the cleanup.
 | `DLO ACTIVE timeout` | The org is slow — re-run the script; it picks up where it left off |
 | Dashboard is blank | Make sure you said **go** and the script completed Phase 10 |
 | Concierge panel not showing | Enable **Analytics Agent Readiness** in Data 360 → Semantic Model → Settings |
-| Something else went wrong | Paste the error into Claude and ask — it can diagnose and fix most issues |
