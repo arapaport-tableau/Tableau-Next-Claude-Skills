@@ -13,14 +13,31 @@ When this skill is invoked, follow the workflow below exactly. Do not skip steps
 
 ```python
 import json, os, sys
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "next_config.json")
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
+from pathlib import Path
+
+_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def load_config(org_name=None):
+    """Load credentials from next_orgs.json (preferred) or next_config.json (legacy)."""
+    orgs_file   = os.path.join(_DIR, "next_orgs.json")
+    config_file = os.path.join(_DIR, "next_config.json")
+
+    if os.path.exists(orgs_file):
+        orgs = json.loads(Path(orgs_file).read_text()).get("orgs", {})
+        if not orgs:
+            print("\n  next_orgs.json has no orgs. Ask Claude to run setup.")
+            sys.exit(1)
+        if org_name and org_name in orgs:
+            return orgs[org_name]
+        return next(iter(orgs.values()))   # fallback: first org
+    elif os.path.exists(config_file):
+        return json.loads(Path(config_file).read_text())
+    else:
         print("\n  No credentials found. Ask Claude to run setup.")
         sys.exit(1)
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
-CONFIG = load_config()
+
+# Usage: CONFIG = load_config()             # use first/only org
+#        CONFIG = load_config("FINS IDO Org")  # select named org (set at top of script)
 ```
 
 ---
@@ -212,9 +229,15 @@ Rules:
 | Score | `"point"` | `"points"` |
 | Headcount | `"employee"` | `"employees"` |
 
-### 6. timeGrains — omit Day for banking demos
+### 6. timeGrains — choose by data granularity
 
-Default: `["Month", "Quarter", "Year"]`. Only add `"Day"` for daily transaction data.
+| Use case | Recommended timeGrains |
+|---|---|
+| Monthly banking (default) | `["Month", "Quarter", "Year"]` |
+| Weekly reporting or activity | `["Week", "Month", "Quarter"]` |
+| Daily balances / transactions | `["Day", "Week", "Month"]` |
+
+Omit grains finer than your data — daily grain on monthly data returns misleading Concierge answers.
 
 ### 7. Field visibility
 
@@ -267,15 +290,49 @@ Rules: each preference starts with `#`, max 300 chars, max 50 preferences per mo
 
 ---
 
-## STEP 1 — CREDENTIAL SETUP (if needed) + GATHER REQUIREMENTS
+## STEP 1 — ORG SELECTION + CREDENTIAL SETUP (if needed) + GATHER REQUIREMENTS
 
-**Check for credentials first.** Before anything else, check whether `next_config.json` exists in the project folder.
+**Check for orgs first — use the Read tool.** Before anything else:
 
-If it does NOT exist, collect credentials:
+1. Try to read `next_orgs.json` in the project folder.
+2. If that doesn't exist, try `next_config.json`.
+3. If neither exists, run credential setup (see below).
+
+**If `next_orgs.json` exists:**
+
+Read it. The structure is:
+```json
+{
+  "orgs": {
+    "Friendly Name A": { ...credentials... },
+    "Friendly Name B": { ...credentials... }
+  }
+}
+```
+
+- **1 org**: use it automatically. Note the name and mention it in the plan.
+- **2+ orgs**: present a numbered list from the actual file contents and ask the user to choose:
+
+> "Which Salesforce org should I publish this demo to?
+>
+> 1. First Meridian (Sandbox)
+> 2. Demo Shared Org
+> 3. Acme Bank (Production)
+>
+> Reply with the number."
+
+Wait for the user's reply before proceeding. Store the selected org name as `ORG_NAME` — it will be embedded in the script as `CONFIG = load_config("ORG_NAME")`.
+
+**If only `next_config.json` exists (legacy):**
+
+Use it as-is. Set `ORG_NAME = None`. The script will use `load_config()` without an org name.
+
+**If neither file exists — collect credentials:**
 
 > "Before I build your demo, I need your Salesforce and Data Cloud connection details. You'll only need to enter these once."
 
 Ask for:
+- A friendly name for this org (e.g., "Demo Shared Org", "First Meridian Sandbox")
 - Salesforce login URL (default: `https://login.salesforce.com`)
 - Connected App client ID (consumer key)
 - Connected App client secret (consumer secret)
@@ -283,32 +340,41 @@ Ask for:
 - Data Cloud domain (the `*.c360a.salesforce.com` domain from Data Cloud Setup)
 - Data Cloud ingestion connector name (short name, e.g. `tableau_next_demo`)
 
-Connected App must have scopes: `cdp_ingest_api`, `cdp_query_api`, `api`, `sfap_api`. Enable Client Credentials Flow.
+Connected App must have scopes: `cdp_ingest_api`, `cdp_query_api`, `api`, `sfap_api`.
 
-Write config file:
+Save as `next_orgs.json`:
 ```json
 {
-  "sf_login_url": "https://login.salesforce.com",
-  "client_id": "<consumer key>",
-  "client_secret": "<consumer secret>",
-  "refresh_token": "<OAuth refresh token>",
-  "data_cloud_domain": "<your-dc-domain (no https://)>",
-  "ingestion_connector_name": "tableau_next_demo",
-  "connector_sf_id": ""
+  "orgs": {
+    "{Friendly Name}": {
+      "sf_login_url": "https://login.salesforce.com",
+      "client_id": "<consumer key>",
+      "client_secret": "<consumer secret>",
+      "refresh_token": "<OAuth refresh token>",
+      "data_cloud_domain": "<your-dc-domain (no https://)>",
+      "ingestion_connector_name": "tableau_next_demo",
+      "connector_sf_id": ""
+    }
+  }
 }
 ```
-Save as `next_config.json`. Do not proceed until this file exists.
+Do not proceed until this file exists.
 
 **Then gather demo requirements.** Parse first, ask second.
 
-Required inputs:
+**Parse first**: Extract everything you can from what the user already said. Only ask for what's still missing. If the user's opening message contains bank name + persona + story, skip straight to STEP 2 and present the plan — do not ask for confirmation of things you already know.
+
+**Minimum to proceed to plan** (everything else has a sensible default):
 - Bank or company name
 - Target persona (e.g., Commercial Banking RM, Wealth Advisor, Branch Manager)
-- Story / narrative (what is trending, what is the business problem)
-- Key entities / tables (what data objects — e.g., Loans, Clients, Activities)
-- Metrics to show in Concierge (4–8 is ideal)
-- Dimensions for slicing (region, segment, product type, etc.)
-- Signal onset (default: 6 months ago)
+- Story / narrative (what is declining, growing, or at risk)
+
+**Defaults if not provided** (state these in the plan, the user can change them):
+- Metrics: derive 4–6 from the persona + story
+- Dimensions: Region, Segment, Product Type
+- Signal onset: 6 months ago, 30% severity, declining
+
+**If something is truly ambiguous**, ask one focused question — not a list.
 
 ---
 
@@ -440,9 +506,9 @@ DEMO_GUIDE     = f"{bank_slug}_{use_case_slug}_demo_guide.md"
 TODAY          = date.today()
 START_DATE     = date(TODAY.year - 2, TODAY.month, 1)
 
-CONCIERGE_QUESTIONS = []   # set during Step F
-METRICS_META        = []   # {"name": ..., "type": ..., "concierge_note": ...}
-VIZ_META            = []   # {"label": ..., "type": ..., "talking_points": [...]}
+CONCIERGE_QUESTIONS = []   # populate with 6–10 demo questions when writing Phase 8 code; printed at end of run + used in demo guide
+METRICS_META        = []   # populate alongside metric definitions: {"name": ..., "type": ..., "concierge_note": ...}
+VIZ_META            = []   # populate alongside viz definitions: {"label": ..., "type": ..., "talking_points": [...]}
 
 # ── Diagnostics ───────────────────────────────────────────────────────────────
 _SCRIPT_START = _time.time()
@@ -471,8 +537,8 @@ def mac_notify(title, message):
         pass
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "next_config.json")
-CONFIG = json.loads(Path(CONFIG_FILE).read_text())
+ORG_NAME = "{Friendly Org Name}"   # from next_orgs.json; set to None to use first org
+CONFIG   = load_config(ORG_NAME)
 sf_token, sf_instance, dc_token, dc_domain = get_tokens(CONFIG)
 SF_HDRS  = {"Authorization": f"Bearer {sf_token}", "Content-Type": "application/json"}
 DC_HDRS  = {"Authorization": f"Bearer {dc_token}", "Content-Type": "application/json"}
@@ -550,9 +616,10 @@ phase(9, "Creating visualizations")
 phase(10, "Building dashboard")
 # See Implementation Reference — STEP N
 
-# ── PHASE 11: Validate + write demo guide ─────────────────────────────────────
+# ── PHASE 11: Validate SDM + write demo guide ─────────────────────────────────
 phase(11, "Validating SDM + writing demo guide")
-# See Implementation Reference — Step H (validate) and STEP 8 (demo guide)
+# SDM validation: Implementation Reference → STEP 7, Step H (GET /validate)
+# Demo guide generation: Implementation Reference → STEP 8 (build_demo_guide function)
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 _total = int(_time.time() - _SCRIPT_START)
@@ -647,9 +714,9 @@ Always auto-generate from BANK_NAME, PERSONA, STORY, metric list, visualization 
 5. **Dashboard `widgets` is a dict, not a list** — array causes 500 error
 6. **Dashboard page `name` must be UUID** — plain strings cause blank canvas
 7. **Dashboard layout `style` must include `cellSpacingX/Y`** — `{}` causes blank canvas
-8. **`style.headers` must be omitted, not `{}`** — empty dict causes JSON_PARSER_ERROR at v66.0
-9. **All dims in `insightsSettings` must also be in `additionalDimensions`** — missing causes 400
-10. **`agentEnabled: True` is not enough for Concierge** — user must enable Analytics Agent Readiness in UI
+8. **All dims in `insightsSettings` must also be in `additionalDimensions`** — missing causes 400
+9. **`agentEnabled: True` is not enough for Concierge** — user must enable Analytics Agent Readiness in UI
+10. **`style.headers` must be omitted entirely** — even `{}` causes `JSON_PARSER_ERROR` at v66.0 (see pitfall #32)
 
 Full list of 57 pitfalls in the Implementation Reference section below.
 
@@ -1790,8 +1857,8 @@ def build_demo_guide(bank_name, use_case, persona, story, signal_onset_months,
 
 1. **Run the script** (if not already done): `python3 {script_name}`
 2. **Enable Analytics Agent Readiness**: Data 360 → Semantic Model → **{sdm_name}** → Settings → Analytics Agent Readiness → toggle ON
-3. **Add Business Preferences**: Data 360 → Semantic Model → {sdm_name} → Business Preferences (use template in skill file)
-4. **Seed Q&A Calibration**: Data 360 → Semantic Model → {sdm_name} → Q&A Calibration → add questions below as Verified Questions
+3. **Business Preferences** are applied automatically by the script. To add custom preferences: Data 360 → Semantic Model → {sdm_name} → Business Preferences
+4. **Seed Q&A Calibration**: Data 360 → Semantic Model → {sdm_name} → Q&A Calibration → add questions below as Verified Questions (see Q&A Calibration Guide at end of skill file)
 
 ---
 
@@ -1907,7 +1974,9 @@ Workspace: {workspace_name}
 
 ## Q&A CALIBRATION GUIDE
 
-Q&A Calibration is a self-serve tool that lets data experts test and improve Concierge answer accuracy. Show it for data/IT/analytics audiences — not executives.
+*(Referenced in demo guide "Before You Demo" step 4. Show for data/IT/analytics audiences — not executives.)*
+
+Q&A Calibration is a self-serve tool that lets data experts test and improve Concierge answer accuracy.
 
 **What it does:**
 - **Questions Bank** — library of test questions with statuses: New, Inaccurate, Verified, Regression
