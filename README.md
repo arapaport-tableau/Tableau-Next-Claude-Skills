@@ -36,7 +36,7 @@ Claude will guide you through everything interactively — creating a Connected 
 
 **You only run setup once per Salesforce org.**
 
-> `next_config.json` contains your credentials — never share it or commit it. It's excluded from this repo by `.gitignore`.
+> `next_orgs.json` contains your credentials — never share it or commit it. It's excluded from this repo by `.gitignore`.
 
 ---
 
@@ -91,7 +91,7 @@ If something goes wrong, paste the error into Claude and ask — it can diagnose
 | Problem | Fix |
 |---|---|
 | `ModuleNotFoundError` | Run `pip3 install -r requirements.txt` and try again |
-| `Authentication failed` | Check `client_id`, `client_secret`, and `refresh_token` in `next_config.json` |
+| `Authentication failed` | Check `client_id`, `client_secret`, and `refresh_token` in `next_orgs.json` |
 | `connector_sf_id not found` | Make sure the connector is named exactly `tableau_next_demo` in Data Cloud Setup |
 | `DLO ACTIVE timeout` | The org is slow — re-run the script; it picks up where it left off |
 | Dashboard is blank | Make sure you said **go** and the script completed Phase 10 |
