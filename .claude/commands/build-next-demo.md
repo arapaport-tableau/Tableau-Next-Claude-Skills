@@ -1614,6 +1614,8 @@ def dash_date_filter(name, label, calc_date_dim_api, sdm_name, sdm_id, default_d
             "source": {"id": sdm_id, "name": sdm_name}}
 
 def dash_toggle_filter(name, label, field_api, sdo_api, sdm_name, sdm_id, single=False):
+    # ⚠️  Only use for fields with ≤4 distinct values.
+    # Fields with 5+ values (e.g. Region=5, Industry=many) overflow horizontally → use dash_list_filter instead.
     return {"actions": [], "name": name, "type": "filter", "label": label,
             "parameters": {"defaultStyle": {"fontColor": _SLDS_BRAND, "textStyle": []},
                            "selectedStyle": {"backgroundColor": _SLDS_BRAND, "fontColor": "#FFFFFF", "textStyle": []},
@@ -1632,12 +1634,55 @@ def dash_text(name, text, bold=True, size="24px", color="#181818"):
                            "receiveFilterSource": {"filterMode": "all", "widgetIds": []}}}
 
 def dash_container(name):
+    """Bordered background card. Position dash_text_inner + dash_viz_inner on top at the same grid coords."""
     return {"actions": [], "name": name, "type": "container",
             "parameters": {"widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderColor": _SLDS_BORDER,
                                            "borderEdges": ["all"], "borderRadius": _SLDS_RADIUS, "borderWidth": 1}}}
 
+def dash_text_inner(name, text, description="", desc_color="#706E6B"):
+    """Title + description for use INSIDE a dash_container card. White bg, no border."""
+    content = [{"attributes": {"bold": True, "color": "#032D60", "size": "14px"}, "insert": text, "rules": []},
+               {"insert": "\n", "rules": []}]
+    if description:
+        content += [{"attributes": {"color": desc_color, "size": "11px"}, "insert": description, "rules": []},
+                    {"insert": "\n", "rules": []}]
+    return {"actions": [], "name": name, "type": "text",
+            "parameters": {"conditionalFormattingRules": [],
+                           "content": content,
+                           "widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderEdges": []},
+                           "receiveFilterSource": {"filterMode": "all", "widgetIds": []}}}
+
+def dash_viz_inner(name, viz_api_name, viz_id, legend_position="Bottom"):
+    """Viz for use INSIDE a dash_container card. No border — container provides the border."""
+    return {"actions": [], "name": name, "type": "visualization",
+            "parameters": {"legendPosition": legend_position,
+                           "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
+                           "widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderEdges": []}},
+            "source": {"id": viz_id, "name": viz_api_name}}
+
 def dash_pos(name, col, row, colspan, rowspan):
     return {"name": name, "column": col, "row": row, "colspan": colspan, "rowspan": rowspan}
+
+# ── UNIFIED CARD PATTERN (title + description + viz as one card) ───────────────
+# Use dash_container + dash_text_inner + dash_viz_inner at overlapping positions.
+# Container spans ALL rows of the card. Text takes the top N rows. Viz takes the rest.
+# Example (cols 2–46, rows 10–22, 13 rows total):
+#
+#   widgets["container_trend"] = dash_container("container_trend")
+#   page_cells.append(dash_pos("container_trend", 2, 10, 45, 13))  # full card
+#
+#   widgets["label_trend"] = dash_text_inner("label_trend", "Balance Trend",
+#       description="Aggregate deposit balance over time...")
+#   page_cells.append(dash_pos("label_trend", 2, 10, 45, 3))       # top 3 rows
+#
+#   widgets["viz_1"] = dash_viz_inner("viz_1", viz_api, viz_id)
+#   page_cells.append(dash_pos("viz_1", 2, 13, 45, 10))            # bottom 10 rows
+#
+# ── OUTER MARGIN RULE ──────────────────────────────────────────────────────────
+# With columnCount=72: reserve col 1 and col 72 as empty gutters. Run all content
+# through cols 2–71. A full-width widget at cols 1–72 renders edge-to-edge (no
+# outer margin) while multi-widget rows get cellSpacing gaps — misaligned appearance.
+# Recommended settings: columnCount=72, rowHeight=16, cellSpacingX=16, cellSpacingY=16
 
 
 # Build dashboard
