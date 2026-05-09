@@ -32,7 +32,7 @@ Type this in the Claude panel:
 
 > "Walk me through setup"
 
-Claude will guide you through everything interactively — creating a Connected App, configuring credentials, and verifying your connection. **You do not need to follow PEER_SETUP.md manually.** Claude handles it step by step and will ask for your input only when needed.
+Claude will guide you through everything interactively — creating a Connected App, configuring credentials, and verifying your connection. **You do not need to follow SETUP.md manually.** Claude handles it step by step and will ask for your input only when needed.
 
 **You only run setup once per Salesforce org.**
 
@@ -48,9 +48,9 @@ Type:
 ```
 
 Claude will ask for:
-- The prospect's name (e.g., "First Meridian Bank")
-- The persona (e.g., "Commercial Banking Relationship Manager")
-- The story (e.g., "Loan originations have been declining for the past 6 months")
+- The prospect's name (e.g., "Acme Corp")
+- The persona (e.g., "VP of Sales")
+- The story (e.g., "Customer churn has been rising for the past 6 months")
 
 It shows you a plan and waits for your approval before building anything. Once you say **go**, it handles everything automatically — generating data, loading it into Data Cloud, building the semantic model, and creating the visualizations and dashboard.
 
@@ -68,7 +68,7 @@ For each demo, Claude creates:
 | Workspace | Tableau Next → Workspaces |
 | Semantic Data Model | Data 360 → Semantic Models |
 | Visualizations + Dashboard | Tableau Next → Visualizations / Dashboards |
-| Demo guide with Concierge questions | This folder → `{bank}_{use_case}_demo_guide.md` |
+| Demo guide with Concierge questions | This folder → `{company_slug}_{use_case}_demo_guide.md` |
 
 ---
 

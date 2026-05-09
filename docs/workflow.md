@@ -362,6 +362,5 @@ curl -X POST "${SF_INSTANCE}/services/data/v66.0/tableau/dashboards?minorVersion
 ## Next Steps
 
 - See [templates-guide.md](templates-guide.md) for complete template catalog and decision matrix
-- See [scripts-guide.md](scripts-guide.md) for detailed script usage
 - See [troubleshooting.md](troubleshooting.md) if you encounter errors
 - See [chart-catalog.md](chart-catalog.md) for full JSON templates

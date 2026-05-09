@@ -1,36 +1,21 @@
-# Claude Code local settings — personal to each machine
-.claude/settings.local.json
-
-# Credentials & secrets — NEVER commit these
-tableau_config.json
+# Credentials — never commit these
+next_orgs.json
 next_config.json
-sf_private_key.pem
-sf_certificate.crt
 
-# Template files are safe to commit
-!next_config.template.json
+# Generated demo artifacts
+*_next_demo.py
+*_demo_guide.md
+next_demos.json
 
-# Python cache
+# Personal session state
+memory/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-
-# Binary / generated data files
-*.hyper
-*.tdsx
-*.zip
-*.pdf
+.env
 
 # macOS
 .DS_Store
-
-# Org credentials — machine-specific, never commit
-next_orgs.json
-next_demos.json
-
-# Bank-specific demo outputs
-*_next_demo.py
-*_demo_guide.md
-
-# Local memory
-memory/
+.claude/settings.local.json

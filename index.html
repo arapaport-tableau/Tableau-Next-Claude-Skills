@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau Next Demo Builder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #2563EB;
+      --blue-light: #EFF6FF;
+      --dark: #0F172A;
+      --slate: #1E293B;
+      --slate-mid: #334155;
+      --muted: #64748B;
+      --border: #E2E8F0;
+      --bg: #F8FAFC;
+      --white: #FFFFFF;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--slate);
+      line-height: 1.6;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #1D4ED8 100%);
+      color: white;
+      padding: 72px 24px 80px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+      backdrop-filter: blur(4px);
+    }
+
+    .hero-badge .dot {
+      width: 7px; height: 7px;
+      background: #4ADE80;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      line-height: 1.1;
+    }
+
+    .hero h1 span { color: #60A5FA; }
+
+    .hero p {
+      font-size: 18px;
+      color: rgba(255,255,255,0.75);
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+      margin-bottom: 44px;
+    }
+
+    .hero-stat { text-align: center; }
+    .hero-stat .num {
+      font-size: clamp(16px, 2vw, 22px);
+      font-weight: 700;
+      color: #60A5FA;
+    }
+    .hero-stat .label { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: var(--dark);
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+
+    .hero-cta:hover { opacity: 0.92; transform: translateY(-1px); }
+
+    /* ── SECTIONS ── */
+    section { padding: 72px 24px; }
+    section:nth-child(even) { background: var(--white); }
+
+    .container { max-width: 1080px; margin: 0 auto; }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    .section-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 560px;
+      margin-bottom: 48px;
+    }
+
+    /* ── EXAMPLE PROMPT ── */
+    .example-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 700px) {
+      .example-wrap { grid-template-columns: 1fr; }
+    }
+
+    .example-block {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .example-block-header {
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .example-input .example-block-header  { background: #1E293B; color: rgba(255,255,255,0.5); }
+    .example-output .example-block-header { background: var(--blue-light); color: var(--blue); }
+
+    .example-input  { background: #0F172A; }
+    .example-output { background: var(--white); }
+
+    .example-input .example-content {
+      padding: 20px 20px 24px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #CBD5E1;
+    }
+
+    .example-input .example-content .prompt-cmd { color: #7DD3FC; }
+    .example-input .example-content .prompt-text { color: #E2E8F0; }
+
+    .example-output .example-content {
+      padding: 20px;
+    }
+
+    .output-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--slate);
+    }
+
+    .output-item:last-child { border-bottom: none; }
+
+    .output-check {
+      width: 20px; height: 20px;
+      background: #DCFCE7;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .output-item .where {
+      margin-left: auto;
+      font-size: 11px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      white-space: nowrap;
+    }
+
+    /* ── WHAT GETS BUILT (LIST) ── */
+    .asset-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 640px) {
+      .asset-list { grid-template-columns: 1fr; }
+    }
+
+    .asset-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      padding: 24px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--white);
+      transition: background 0.15s;
+    }
+
+    .asset-item:hover { background: var(--bg); }
+    .asset-item:nth-child(odd) { border-right: 1px solid var(--border); }
+    .asset-item:nth-last-child(-n+2) { border-bottom: none; }
+
+    @media (max-width: 640px) {
+      .asset-item:nth-child(odd) { border-right: none; }
+      .asset-item:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
+      .asset-item:last-child { border-bottom: none; }
+    }
+
+    .asset-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue);
+      font-family: "SF Mono", "Fira Code", monospace;
+      letter-spacing: 0.05em;
+      min-width: 24px;
+      padding-top: 3px;
+    }
+
+    .asset-emoji { font-size: 22px; min-width: 28px; line-height: 1.3; }
+    .asset-body { flex: 1; }
+    .asset-body h3 { font-size: 15px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+    .asset-body p  { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+
+    .asset-tag {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      color: var(--slate-mid);
+    }
+
+    .asset-item:hover .asset-tag { background: var(--white); }
+
+    /* ── HOW IT WORKS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      position: relative;
+    }
+
+    @media (max-width: 700px) {
+      .steps { grid-template-columns: 1fr; }
+    }
+
+    .step {
+      padding: 32px;
+      position: relative;
+    }
+
+    .step:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+
+    @media (max-width: 700px) {
+      .step:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+
+    .step-num {
+      width: 36px; height: 36px;
+      background: var(--blue);
+      color: white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .step h3 { font-size: 17px; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
+    .step p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+    .step-command {
+      margin-top: 14px;
+      display: inline-block;
+      background: var(--dark);
+      color: #7DD3FC;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 8px;
+    }
+
+    /* ── FILE TREE ── */
+    .tree-wrap {
+      background: var(--slate);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .tree-titlebar {
+      background: #1E293B;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .tree-dots { display: flex; gap: 7px; }
+    .tree-dots span { width: 12px; height: 12px; border-radius: 50%; }
+    .tree-dots span:nth-child(1) { background: #FF5F57; }
+    .tree-dots span:nth-child(2) { background: #FFBD2E; }
+    .tree-dots span:nth-child(3) { background: #28CA41; }
+
+    .tree-title {
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      font-family: "SF Mono", "Fira Code", monospace;
+      flex: 1;
+      text-align: center;
+    }
+
+    .tree {
+      padding: 24px 28px 28px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13.5px;
+      line-height: 1.85;
+      color: #CBD5E1;
+    }
+
+    .tree .root  { color: #7DD3FC; font-weight: 700; font-size: 15px; }
+    .tree .dir   { color: #7DD3FC; }
+    .tree .file  { color: #CBD5E1; }
+    .tree .key   { color: #A78BFA; }
+    .tree .cred  { color: #6EE7B7; }
+    .tree .skill { color: #FCD34D; font-weight: 600; }
+    .tree .html  { color: #FB923C; font-weight: 600; }
+
+    .tree-row { display: flex; align-items: baseline; }
+
+    .tree-annotation {
+      margin-left: 18px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    /* ── GETTING STARTED ── */
+    .start-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 680px) {
+      .start-grid { grid-template-columns: 1fr; }
+    }
+
+    .start-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 32px;
+    }
+
+    section:nth-child(even) .start-block { background: var(--white); }
+
+    .start-block h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .start-block ol, .start-block ul {
+      padding-left: 18px;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 2.1;
+    }
+
+    .start-block code {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+
+    section:nth-child(even) .start-block code { background: var(--bg); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--dark);
+      color: rgba(255,255,255,0.4);
+      text-align: center;
+      padding: 40px 24px;
+      font-size: 13px;
+    }
+
+    footer .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    footer a { color: #60A5FA; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer .footer-copy { color: rgba(255,255,255,0.25); }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Claude Code Skill · Tableau Next
+  </div>
+  <h1>Build complete <span>Tableau Next</span> demos<br>from a plain-English description</h1>
+  <p>Describe the prospect, the persona, and the story. Claude handles everything — data, semantic model, visualizations, and dashboard — automatically in your Salesforce org.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="num">2 weeks → 2 hrs</div>
+      <div class="label">Demo prep time</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">No code required</div>
+      <div class="label">Plain English only</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">Any industry</div>
+      <div class="label">Retail, finance, healthcare...</div>
+    </div>
+  </div>
+  <a href="https://github.com/arapaport-tableau/Tableau-Next-Claude-Skills" class="hero-cta">⭐ View on GitHub</a>
+</div>
+
+<!-- EXAMPLE PROMPT -->
+<section>
+  <div class="container">
+    <div class="section-label">See it in action</div>
+    <h2>You describe it. Claude builds it.</h2>
+    <p class="section-sub">Tell Claude the company, the persona, and the story. That's the entire spec.</p>
+    <div class="example-wrap">
+      <div class="example-block example-input">
+        <div class="example-block-header">⌨ What you type</div>
+        <div class="example-content">
+          <span class="prompt-cmd">/build-next-demo</span><br><br>
+          <span class="prompt-text">Build a demo for Acme Corp.<br>
+Persona: VP of Customer Success.<br>
+Story: customer churn has been rising<br>
+for the past two quarters and the team<br>
+doesn't have visibility into why.<br><br>
+Show Churn Rate, Retention Rate,<br>
+Support Ticket Volume, and<br>
+Average Resolution Time.</span>
+        </div>
+      </div>
+      <div class="example-block example-output">
+        <div class="example-block-header">✓ What gets built</div>
+        <div class="example-content">
+          <div class="output-item"><div class="output-check">✓</div> Demo plan + metric classification <span class="where">confirmed by you</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Synthetic data with churn signals <span class="where">Data Cloud</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Workspace: acme_cx <span class="where">Tableau Next</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Semantic Data Model <span class="where">Data 360</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Concierge AI metrics &amp; Q&amp;A <span class="where">Data 360</span></div>
+          <div class="output-item"><div class="output-check">✓</div> 4 visualizations <span class="where">Tableau Next</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Dashboard <span class="where">Tableau Next</span></div>
+          <div class="output-item"><div class="output-check">✓</div> Demo guide with Concierge questions <span class="where">local file</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT GETS BUILT -->
+<section>
+  <div class="container">
+    <div class="section-label">What gets built</div>
+    <h2>One command. Eight assets.</h2>
+    <p class="section-sub">Every build starts with a story design and ends with a complete, demo-ready Tableau Next environment in your Salesforce org.</p>
+    <div class="asset-list">
+      <div class="asset-item">
+        <div class="asset-num">01</div>
+        <div class="asset-emoji">🎯</div>
+        <div class="asset-body">
+          <h3>Demo Design</h3>
+          <p>Before any code runs, Claude plans the full use case — classifying metrics, defining the narrative arc, and engineering data signals so every chart tells a compelling story.</p>
+          <span class="asset-tag">plan → confirm → build</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">02</div>
+        <div class="asset-emoji">📊</div>
+        <div class="asset-body">
+          <h3>Synthetic Data</h3>
+          <p>Realistic data generated with engineered signals — trends, anomalies, and seasonality baked in so the demo tells a story.</p>
+          <span class="asset-tag">Data Cloud → Data Explorer</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">03</div>
+        <div class="asset-emoji">🗂️</div>
+        <div class="asset-body">
+          <h3>Workspace</h3>
+          <p>A named Tableau Next workspace scoped to your prospect, keeping all demo assets organized and easy to find.</p>
+          <span class="asset-tag">Tableau Next → Workspaces</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">04</div>
+        <div class="asset-emoji">🧠</div>
+        <div class="asset-body">
+          <h3>Semantic Data Model</h3>
+          <p>A governed, business-friendly layer over Data Cloud — the foundation for Concierge AI natural language Q&amp;A.</p>
+          <span class="asset-tag">Data 360 → Semantic Models</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">05</div>
+        <div class="asset-emoji">💬</div>
+        <div class="asset-body">
+          <h3>Concierge AI Q&amp;A</h3>
+          <p>Calculated fields and semantic metrics engineered so Concierge AI can answer natural language questions about the data — live, in the demo.</p>
+          <span class="asset-tag">Data 360 → Semantic Models</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">06</div>
+        <div class="asset-emoji">📈</div>
+        <div class="asset-body">
+          <h3>Visualizations</h3>
+          <p>Four charts tailored to the use case — bar, line, donut, and more — built via API with the right fields and encodings.</p>
+          <span class="asset-tag">Tableau Next → Visualizations</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">07</div>
+        <div class="asset-emoji">🖥️</div>
+        <div class="asset-body">
+          <h3>Dashboard</h3>
+          <p>A complete, styled dashboard combining visualizations and metrics — ready to present without any manual assembly.</p>
+          <span class="asset-tag">Tableau Next → Dashboards</span>
+        </div>
+      </div>
+      <div class="asset-item">
+        <div class="asset-num">08</div>
+        <div class="asset-emoji">📋</div>
+        <div class="asset-body">
+          <h3>Demo Guide</h3>
+          <p>A run-of-show with suggested Concierge AI questions, talking points, and the narrative arc for the live demo.</p>
+          <span class="asset-tag">{company}_{use_case}_demo_guide.md</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2>From description to demo in three steps.</h2>
+    <p class="section-sub">No JSON. No API calls. No setup beyond one-time org credentials.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Connect your org</h3>
+        <p>Run the setup script once per Salesforce org. Claude walks you through creating a Connected App and stores credentials securely in <code style="font-size:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-family:monospace;">next_orgs.json</code>.</p>
+        <span class="step-command">python3 next_setup.py</span>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Describe the demo</h3>
+        <p>Tell Claude the company, the persona, the story, and the metrics you want to highlight. Claude proposes a plan and waits for your approval before building anything.</p>
+        <span class="step-command">/build-next-demo</span>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Say go — then present</h3>
+        <p>Claude builds everything automatically in 8–15 minutes. You get a Mac notification when it's done. Open Tableau Next and your demo is ready.</p>
+        <span class="step-command">type "go" → done</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FILE STRUCTURE -->
+<section>
+  <div class="container">
+    <div class="section-label">Repository structure</div>
+    <h2>What's in the box.</h2>
+    <p class="section-sub">Every file has a purpose. Nothing extra.</p>
+    <div class="tree-wrap">
+      <div class="tree-titlebar">
+        <div class="tree-dots"><span></span><span></span><span></span></div>
+        <div class="tree-title">tableau-next-demo-builder/</div>
+        <div style="width:52px"></div>
+      </div>
+      <div class="tree">
+        <div class="tree-row"><span class="root">tableau-next-demo-builder/</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="html">index.html</span><span class="tree-annotation">← This page</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="key">CLAUDE.md</span><span class="tree-annotation">← AI context: what the skill knows and how to behave</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">README.md</span><span class="tree-annotation">← Quickstart for new users</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">SETUP.md</span><span class="tree-annotation">← Manual setup reference</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">requirements.txt</span><span class="tree-annotation">← Python dependencies</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">next_setup.py</span><span class="tree-annotation">← First-time org connection wizard</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">next_teardown.py</span><span class="tree-annotation">← Removes demo assets from org</span></div>
+        <div class="tree-row"><span class="cred">├── </span><span class="cred">next_orgs.template.json</span><span class="tree-annotation">← Credential template (safe to commit)</span></div>
+        <div class="tree-row"><span class="file">├── </span><span class="file">.gitignore</span><span class="tree-annotation">← Protects credentials and demo artifacts</span></div>
+        <div style="height:6px"></div>
+        <div class="tree-row"><span class="file">├── </span><span class="dir">.claude/</span></div>
+        <div class="tree-row"><span class="file">│   └── </span><span class="dir">commands/</span></div>
+        <div class="tree-row"><span class="file">│       └── </span><span class="skill">build-next-demo.md</span><span class="tree-annotation">← The main skill (Claude's instructions)</span></div>
+        <div style="height:6px"></div>
+        <div class="tree-row"><span class="file">└── </span><span class="dir">docs/</span><span class="tree-annotation">← Reference docs Claude uses during builds</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">api-reference.md</span><span class="tree-annotation">← REST API endpoints (v66.0)</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">authentication.md</span><span class="tree-annotation">← Auth patterns and refresh token setup</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">workflow.md</span><span class="tree-annotation">← 6-phase build process</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">chart-catalog.md</span><span class="tree-annotation">← JSON templates for all chart types</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">troubleshooting.md</span><span class="tree-annotation">← Error catalog with fixes</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">format-patterns.md</span><span class="tree-annotation">← Number format types</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">templates-guide.md</span><span class="tree-annotation">← Dashboard patterns and decision matrix</span></div>
+        <div class="tree-row"><span class="file">    ├── </span><span class="file">examples.md</span><span class="tree-annotation">← Worked examples (Sales, Marketing, HR)</span></div>
+        <div class="tree-row"><span class="file">    └── </span><span class="dir">dashboard-templates/</span><span class="tree-annotation">← Production-ready JSON layout templates</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GETTING STARTED -->
+<section>
+  <div class="container">
+    <div class="section-label">Getting started</div>
+    <h2>Up and running in 30 minutes.</h2>
+    <p class="section-sub">Everything you need is in this repo.</p>
+    <div class="start-grid">
+      <div class="start-block">
+        <h3>📋 Prerequisites</h3>
+        <ul>
+          <li>Claude Code installed — <a href="https://claude.ai/code" style="color:var(--blue);">claude.ai/code</a></li>
+          <li>Python 3.10+</li>
+          <li>Salesforce org with Data Cloud and Tableau Next provisioned</li>
+          <li>Admin access to create a Connected App</li>
+          <li>See <code>SETUP.md</code> for the full manual setup walkthrough</li>
+        </ul>
+      </div>
+      <div class="start-block">
+        <h3>🚀 Build your first demo</h3>
+        <ol>
+          <li>Open this folder in Claude Code</li>
+          <li>Run <code>python3 next_setup.py</code> to connect your org</li>
+          <li>Type <code>/build-next-demo</code> and describe the demo</li>
+          <li>Review the plan Claude proposes, then type <code>go</code></li>
+          <li>Get a Mac notification when the build completes</li>
+          <li>Run <code>python3 next_teardown.py</code> to clean up after the demo</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/arapaport-tableau/Tableau-Next-Claude-Skills">GitHub</a>
+    <a href="README.md">README</a>
+    <a href="SETUP.md">Setup Guide</a>
+    <a href="https://claude.ai/code">Claude Code</a>
+  </div>
+  <div class="footer-copy">Tableau Next Demo Builder · Built with Claude Code</div>
+</footer>
+
+</body>
+</html>

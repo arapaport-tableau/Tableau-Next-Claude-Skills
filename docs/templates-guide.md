@@ -447,6 +447,6 @@ For complete JSON templates ready to copy-paste, see [chart-catalog.md](chart-ca
 ## Related Documentation
 
 - [workflow.md](workflow.md) - Step-by-step dashboard creation process
-- [scripts-guide.md](scripts-guide.md) - Script usage and automation
+- [workflow.md](workflow.md) - Step-by-step dashboard creation process
 - [troubleshooting.md](troubleshooting.md) - Common errors and solutions
 - [chart-catalog.md](chart-catalog.md) - Complete JSON templates

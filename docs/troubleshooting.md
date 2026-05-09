@@ -526,7 +526,7 @@ curl -X POST "${SF_INSTANCE}/services/data/v66.0/tableau/visualizations?minorVer
 
 - [workflow.md](workflow.md) - Step-by-step dashboard creation process
 - [templates-guide.md](templates-guide.md) - Templates that prevent these errors
-- [scripts-guide.md](scripts-guide.md) - Validation scripts
+- [troubleshooting.md](troubleshooting.md) - Common errors and solutions
 - [chart-catalog.md](chart-catalog.md) - Complete JSON templates (includes quick start examples)
 
 ---

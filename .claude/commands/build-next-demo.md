@@ -1,6 +1,37 @@
-You are a specialist in building complete, end-to-end Tableau Next demo assets for financial services use cases. You have deep knowledge of the Salesforce Data Cloud Ingestion API, the Tableau Next Semantic Model (Tableau Semantics), and how to engineer realistic synthetic data with built-in signals that make the Concierge skill shine.
+You are a specialist in building complete, end-to-end Tableau Next demo assets . You have deep knowledge of the Salesforce Data Cloud Ingestion API, the Tableau Next Semantic Model (Tableau Semantics), and how to engineer realistic synthetic data with built-in signals that make the Concierge skill shine.
 
 When this skill is invoked, follow the workflow below exactly. Do not skip steps or reorder them.
+
+**CRITICAL — Reference Working Scripts:** When building any new demo script, always read and adapt a script confirmed deployed in this project first Never write API payloads from memory or inference. Only change field names, labels, and business logic — never the API structure or endpoint paths. If hitting an API error, check the working script first before trying other approaches.
+
+---
+
+## ERROR RECOVERY DECISION TREES
+
+### Stream stuck in "Creating" for >120s
+1. Check `GET /ssot/data-streams/{name}` — if status is still "Creating", wait up to 300s total
+2. If status is "Error", delete the stream and recreate
+3. If timeout, exit with clear message — ask user to check Data Cloud Setup UI
+
+### Bulk ingest returns 409 CONFLICT
+1. Check for in-flight jobs: `GET /api/v1/ingest/jobs` → look for `state: "Open"` or `"InProgress"` on same object
+2. If found, wait for it to complete — do NOT create a new job
+3. If no in-flight jobs, the 409 is stale — retry with a new job
+
+### Bulk job timeout (>600s)
+1. Do NOT mark as failed — job may still be processing async
+2. Exit with: "Data Cloud is still processing. Wait 10–15 min, then run with `--skip-ingest`"
+3. The `--skip-ingest` flag skips DC ingestion on reruns (~8 min saved)
+
+### Visualization returns 400 INVALID_INPUT
+1. Check `resp.text` for the specific field causing the error
+2. Most common: missing `objectName` on raw SDO field, or including `objectName` on calc field
+3. Verify `style` has ALL required keys (partial style = rejected)
+
+### SDM metric creation returns 400
+1. Check that `calculatedFieldApiName` (not `tableFieldReference`) is used in `measurementReference`
+2. Check that all dims in `insightsSettings` also appear in `additionalDimensions`
+3. Check that `timeDimensionReference` uses a calc date dimension, not a raw SDO field
 
 ---
 
@@ -13,31 +44,14 @@ When this skill is invoked, follow the workflow below exactly. Do not skip steps
 
 ```python
 import json, os, sys
-from pathlib import Path
-
-_DIR = os.path.dirname(os.path.abspath(__file__))
-
-def load_config(org_name=None):
-    """Load credentials from next_orgs.json (preferred) or next_config.json (legacy)."""
-    orgs_file   = os.path.join(_DIR, "next_orgs.json")
-    config_file = os.path.join(_DIR, "next_config.json")
-
-    if os.path.exists(orgs_file):
-        orgs = json.loads(Path(orgs_file).read_text()).get("orgs", {})
-        if not orgs:
-            print("\n  next_orgs.json has no orgs. Ask Claude to run setup.")
-            sys.exit(1)
-        if org_name and org_name in orgs:
-            return orgs[org_name]
-        return next(iter(orgs.values()))   # fallback: first org
-    elif os.path.exists(config_file):
-        return json.loads(Path(config_file).read_text())
-    else:
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "next_config.json")
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
         print("\n  No credentials found. Ask Claude to run setup.")
         sys.exit(1)
-
-# Usage: CONFIG = load_config()             # use first/only org
-#        CONFIG = load_config("FINS IDO Org")  # select named org (set at top of script)
+    with open(CONFIG_FILE) as f:
+        return json.load(f)
+CONFIG = load_config()
 ```
 
 ---
@@ -229,15 +243,9 @@ Rules:
 | Score | `"point"` | `"points"` |
 | Headcount | `"employee"` | `"employees"` |
 
-### 6. timeGrains — choose by data granularity
+### 6. timeGrains — omit Day for banking demos
 
-| Use case | Recommended timeGrains |
-|---|---|
-| Monthly banking (default) | `["Month", "Quarter", "Year"]` |
-| Weekly reporting or activity | `["Week", "Month", "Quarter"]` |
-| Daily balances / transactions | `["Day", "Week", "Month"]` |
-
-Omit grains finer than your data — daily grain on monthly data returns misleading Concierge answers.
+Default: `["Month", "Quarter", "Year"]`. Only add `"Day"` for daily transaction data.
 
 ### 7. Field visibility
 
@@ -290,49 +298,15 @@ Rules: each preference starts with `#`, max 300 chars, max 50 preferences per mo
 
 ---
 
-## STEP 1 — ORG SELECTION + CREDENTIAL SETUP (if needed) + GATHER REQUIREMENTS
+## STEP 1 — CREDENTIAL SETUP (if needed) + GATHER REQUIREMENTS
 
-**Check for orgs first — use the Read tool.** Before anything else:
+**Check for credentials first.** Before anything else, check whether `next_config.json` exists in the project folder.
 
-1. Try to read `next_orgs.json` in the project folder.
-2. If that doesn't exist, try `next_config.json`.
-3. If neither exists, run credential setup (see below).
-
-**If `next_orgs.json` exists:**
-
-Read it. The structure is:
-```json
-{
-  "orgs": {
-    "Friendly Name A": { ...credentials... },
-    "Friendly Name B": { ...credentials... }
-  }
-}
-```
-
-- **1 org**: use it automatically. Note the name and mention it in the plan.
-- **2+ orgs**: present a numbered list from the actual file contents and ask the user to choose:
-
-> "Which Salesforce org should I publish this demo to?
->
-> 1. First Meridian (Sandbox)
-> 2. Demo Shared Org
-> 3. Acme Bank (Production)
->
-> Reply with the number."
-
-Wait for the user's reply before proceeding. Store the selected org name as `ORG_NAME` — it will be embedded in the script as `CONFIG = load_config("ORG_NAME")`.
-
-**If only `next_config.json` exists (legacy):**
-
-Use it as-is. Set `ORG_NAME = None`. The script will use `load_config()` without an org name.
-
-**If neither file exists — collect credentials:**
+If it does NOT exist, collect credentials:
 
 > "Before I build your demo, I need your Salesforce and Data Cloud connection details. You'll only need to enter these once."
 
 Ask for:
-- A friendly name for this org (e.g., "Demo Shared Org", "First Meridian Sandbox")
 - Salesforce login URL (default: `https://login.salesforce.com`)
 - Connected App client ID (consumer key)
 - Connected App client secret (consumer secret)
@@ -340,41 +314,32 @@ Ask for:
 - Data Cloud domain (the `*.c360a.salesforce.com` domain from Data Cloud Setup)
 - Data Cloud ingestion connector name (short name, e.g. `tableau_next_demo`)
 
-Connected App must have scopes: `cdp_ingest_api`, `cdp_query_api`, `api`, `sfap_api`.
+Connected App must have scopes: `cdp_ingest_api`, `cdp_query_api`, `api`, `sfap_api`. Enable Client Credentials Flow.
 
-Save as `next_orgs.json`:
+Write config file:
 ```json
 {
-  "orgs": {
-    "{Friendly Name}": {
-      "sf_login_url": "https://login.salesforce.com",
-      "client_id": "<consumer key>",
-      "client_secret": "<consumer secret>",
-      "refresh_token": "<OAuth refresh token>",
-      "data_cloud_domain": "<your-dc-domain (no https://)>",
-      "ingestion_connector_name": "tableau_next_demo",
-      "connector_sf_id": ""
-    }
-  }
+  "sf_login_url": "https://login.salesforce.com",
+  "client_id": "<consumer key>",
+  "client_secret": "<consumer secret>",
+  "refresh_token": "<OAuth refresh token>",
+  "data_cloud_domain": "<your-dc-domain (no https://)>",
+  "ingestion_connector_name": "tableau_next_demo",
+  "connector_sf_id": ""
 }
 ```
-Do not proceed until this file exists.
+Save as `next_config.json`. Do not proceed until this file exists.
 
 **Then gather demo requirements.** Parse first, ask second.
 
-**Parse first**: Extract everything you can from what the user already said. Only ask for what's still missing. If the user's opening message contains bank name + persona + story, skip straight to STEP 2 and present the plan — do not ask for confirmation of things you already know.
-
-**Minimum to proceed to plan** (everything else has a sensible default):
+Required inputs:
 - Bank or company name
 - Target persona (e.g., Commercial Banking RM, Wealth Advisor, Branch Manager)
-- Story / narrative (what is declining, growing, or at risk)
-
-**Defaults if not provided** (state these in the plan, the user can change them):
-- Metrics: derive 4–6 from the persona + story
-- Dimensions: Region, Segment, Product Type
-- Signal onset: 6 months ago, 30% severity, declining
-
-**If something is truly ambiguous**, ask one focused question — not a list.
+- Story / narrative (what is trending, what is the business problem)
+- Key entities / tables (what data objects — e.g., Loans, Clients, Activities)
+- Metrics to show in Concierge (4–8 is ideal)
+- Dimensions for slicing (region, segment, product type, etc.)
+- Signal onset (default: 6 months ago)
 
 ---
 
@@ -428,6 +393,35 @@ def signal_ramp(d, onset=SIGNAL_ONSET, duration=6):
     if mft <= onset: return 0.0
     return min(1.0, (mft - onset) / duration)
 ```
+
+---
+
+## DASHBOARD DESIGN — 3-STAGE PROCESS (Always Follow)
+
+Before building any Tableau Next dashboard, follow this process:
+
+**Stage 1: Requirements PRD** — Write before touching code. Captures: Title & Objective, Personas, Jobs to Be Done (3–5), Priorities (P0/P1/P2), Out of scope.
+
+**Stage 2: Layout Spec** — Grid-level spec (table with widget name, type, rows/cols, source, mark type, notes). Maps 1:1 to API payload. Forces you to catch empty space, missing source IDs, and conflicting row counts BEFORE writing code.
+
+**Stage 3: Translate to API** — Only after layout spec is approved, write code.
+
+**Visual Design Patterns (from confirmed working demos):**
+- Dark navy header band (`#0B1F3A`) at top with dashboard title + purpose
+- Global filters: date range dropdown + segment toggle buttons
+- KPI cards: metric name label (12px muted gray) + large current value (24–32px navy bold) + trend vs prior period + mini sparkline
+- Charts: bold title + one-line subtitle describing what to look for and how to interpret
+- Detail table at bottom with clickable client names
+- Single official Tableau Next color per metric used consistently across all charts
+- Compact number formatting (`$1.2M`, not `$1,200,000`)
+- Every chart must have subtitle explaining what it shows, what to look for, what it means
+- Never leave empty layout gaps — fill full width when a chart is absent
+
+**Embedded Dashboards (Account Page / LWC context):**
+- No header band (Account page provides context)
+- No filter widget (account passes context via page attributes)
+- Target height ~450px (18 rows × 24px = 432px) — must fit without scrolling
+- Use tab navigation for multiple content areas
 
 ---
 
@@ -506,9 +500,9 @@ DEMO_GUIDE     = f"{bank_slug}_{use_case_slug}_demo_guide.md"
 TODAY          = date.today()
 START_DATE     = date(TODAY.year - 2, TODAY.month, 1)
 
-CONCIERGE_QUESTIONS = []   # populate with 6–10 demo questions when writing Phase 8 code; printed at end of run + used in demo guide
-METRICS_META        = []   # populate alongside metric definitions: {"name": ..., "type": ..., "concierge_note": ...}
-VIZ_META            = []   # populate alongside viz definitions: {"label": ..., "type": ..., "talking_points": [...]}
+CONCIERGE_QUESTIONS = []   # set during Step F
+METRICS_META        = []   # {"name": ..., "type": ..., "concierge_note": ...}
+VIZ_META            = []   # {"label": ..., "type": ..., "talking_points": [...]}
 
 # ── Diagnostics ───────────────────────────────────────────────────────────────
 _SCRIPT_START = _time.time()
@@ -537,8 +531,8 @@ def mac_notify(title, message):
         pass
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-ORG_NAME = "{Friendly Org Name}"   # from next_orgs.json; set to None to use first org
-CONFIG   = load_config(ORG_NAME)
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "next_config.json")
+CONFIG = json.loads(Path(CONFIG_FILE).read_text())
 sf_token, sf_instance, dc_token, dc_domain = get_tokens(CONFIG)
 SF_HDRS  = {"Authorization": f"Bearer {sf_token}", "Content-Type": "application/json"}
 DC_HDRS  = {"Authorization": f"Bearer {dc_token}", "Content-Type": "application/json"}
@@ -616,10 +610,9 @@ phase(9, "Creating visualizations")
 phase(10, "Building dashboard")
 # See Implementation Reference — STEP N
 
-# ── PHASE 11: Validate SDM + write demo guide ─────────────────────────────────
+# ── PHASE 11: Validate + write demo guide ─────────────────────────────────────
 phase(11, "Validating SDM + writing demo guide")
-# SDM validation: Implementation Reference → STEP 7, Step H (GET /validate)
-# Demo guide generation: Implementation Reference → STEP 8 (build_demo_guide function)
+# See Implementation Reference — Step H (validate) and STEP 8 (demo guide)
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 _total = int(_time.time() - _SCRIPT_START)
@@ -714,9 +707,9 @@ Always auto-generate from BANK_NAME, PERSONA, STORY, metric list, visualization 
 5. **Dashboard `widgets` is a dict, not a list** — array causes 500 error
 6. **Dashboard page `name` must be UUID** — plain strings cause blank canvas
 7. **Dashboard layout `style` must include `cellSpacingX/Y`** — `{}` causes blank canvas
-8. **All dims in `insightsSettings` must also be in `additionalDimensions`** — missing causes 400
-9. **`agentEnabled: True` is not enough for Concierge** — user must enable Analytics Agent Readiness in UI
-10. **`style.headers` must be omitted entirely** — even `{}` causes `JSON_PARSER_ERROR` at v66.0 (see pitfall #32)
+8. **`style.headers` must be omitted, not `{}`** — empty dict causes JSON_PARSER_ERROR at v66.0
+9. **All dims in `insightsSettings` must also be in `additionalDimensions`** — missing causes 400
+10. **`agentEnabled: True` is not enough for Concierge** — user must enable Analytics Agent Readiness in UI
 
 Full list of 57 pitfalls in the Implementation Reference section below.
 
@@ -1566,11 +1559,13 @@ def build_viz_style(axis_dict, pane_dict, reverse_range=False, dim_row_keys=None
         "fit": "Standard",
         "fonts": VIZ_FONTS,
         "lines": VIZ_LINES,
-        "marks": {"ALL": {"color": {"color": ""}, "isAutomaticSize": False,
+        "marks": {"ALL": {"color": {"color": ""}, "isAutomaticSize": True,
                           "isStackingAxisCentered": False,
                           "label": {"canOverlapLabels": False, "marksToLabel": {"type": "All"}, "showMarkLabels": False},
                           "range": {"reverse": reverse_range},
-                          "size": {"isAutomatic": False, "type": "Pixel", "value": 4}}},
+                          "size": {"isAutomatic": True, "type": "Percentage", "value": 75}}},
+                          # isAutomaticSize: True + Percentage/75 = properly proportioned bars
+                          # Pixel/4 makes bars too thin — always use Percentage
         "panes": pane_dict,
         "referenceLines": {},
         "shading": VIZ_SHADING,
@@ -1634,7 +1629,54 @@ vol_region = create_visualization(
 ```
 
 **Confirmed working mark types**: `"Bar"`, `"Line"`, `"Area"`, `"Circle"` (scatter). `"Pie"` → rejected.
-**Sorting**: `sortOrders` only works for `mode="Table"` — cannot sort bar/line charts via API.
+
+**Confirmed encoding types**: `"Color"` (color by dim), `"Detail"` (one mark per entity — scatter), `"Size"` (not yet tested).
+
+**Scatter plot** — two measures on rows/columns. `"Detail"` encoding creates one dot per entity. `"Color"` encoding colors by a dimension. Both measures in `style.axis`. `allHeaders.fields: {}`. Dot sizing: `isAutomaticSize: False, size: {isAutomatic: False, type: "Percentage", value: 2}` ("Relative" in UI — scales with container). fit: `"Entire"`:
+```python
+# F1=measure(cols), F2=measure(rows), F3=dim(Detail — one dot per), F4=dim(Color)
+"marks": {"ALL": {"encodings": [{"fieldKey": "F3", "type": "Detail"},
+                                 {"fieldKey": "F4", "type": "Color"}],
+                  "isAutomatic": True, "stack": {"isAutomatic": True, "isStacked": False},
+                  "type": "Circle"}},
+"legends": {"F4": {"isVisible": True, "position": "Right", "title": {"isVisible": True}}},
+# style.marks.ALL: isAutomaticSize: False, size: {isAutomatic: False, type: "Percentage", value: 2}
+```
+
+**Stacked bar** — same as bar but `stack: {isAutomatic: True, isStacked: True}`. Color encoding on stacking dim. Legend required:
+```python
+"marks": {"ALL": {"encodings": [{"fieldKey": "F3", "type": "Color"}],
+                  "isAutomatic": True, "stack": {"isAutomatic": True, "isStacked": True},
+                  "type": "Bar"}},
+```
+
+**Multi-series line** — date on columns (Continuous calc dim, no objectName/function), Color encoding creates one line per dim value. Size: `Pixel/3`. fit: `"Standard"`. Date axis: `scale.format.dateTemplate: ""`:
+```python
+# F1=date calc dim (Continuous, no objectName), F2=measure, F3=dim(Color)
+"marks": {"ALL": {"encodings": [{"fieldKey": "F3", "type": "Color"}],
+                  "isAutomatic": True, "stack": {"isAutomatic": True, "isStacked": False},
+                  "type": "Line"}},
+"legends": {"F3": {"isVisible": True, "position": "Right", "title": {"isVisible": True}}},
+# style.marks.ALL: isAutomaticSize: True, size: {isAutomatic: True, type: "Pixel", value: 3}
+```
+
+**Confirmed `fit` values**: `"Standard"` (default), `"Entire"` (fills widget — NOT "EntireView"), `"RowHeadersWidth"` (Table mode only).
+
+**Sorting bar/line charts** — use `viewSpecification.sortOrders.fields` (confirmed working):
+```python
+"sortOrders": {
+    "columns": [],
+    "fields": {"F2": {"byField": "F1", "order": "Descending", "type": "Field"}},
+    "rows": []
+}
+```
+- `type: "Field"` — NOT `"FieldSort"` or `"Descending"`
+- `byField` = the measure field key that determines sort order
+- Table mode rejects this — "Field sort is only allowed for visualizations"
+
+**Table mode** — use `mode: "Table"` with all fields in `rows`, `columns: []`, per-field marks `type: "Text"`, `fit: "RowHeadersWidth"`, `axis: {}`. No sort — Table mode rejects field sort. `showDataPlaceholder: False` still required.
+
+**Bar sizing** — use `isAutomaticSize: True` and `size: {isAutomatic: True, type: "Percentage", value: 75}` for properly-proportioned bars. The Pixel/4 pattern makes bars too thin.
 
 ---
 
@@ -1679,19 +1721,31 @@ def dash_date_filter(name, label, calc_date_dim_api, sdm_name, sdm_id, default_d
                            "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
                            "viewType": "list", "widgetStyle": FILTER_STYLE},
             "source": {"id": sdm_id, "name": sdm_name}}
+            # NOTE: source must NOT include "type" field — it's read-only in GET responses, rejected on POST (JSON_PARSER_ERROR)
 
-def dash_toggle_filter(name, label, field_api, sdo_api, sdm_name, sdm_id, single=False):
-    # ⚠️  Only use for fields with ≤4 distinct values.
-    # Fields with 5+ values (e.g. Region=5, Industry=many) overflow horizontally → use dash_list_filter instead.
-    return {"actions": [], "name": name, "type": "filter", "label": label,
-            "parameters": {"defaultStyle": {"fontColor": _SLDS_BRAND, "textStyle": []},
-                           "selectedStyle": {"backgroundColor": _SLDS_BRAND, "fontColor": "#FFFFFF", "textStyle": []},
-                           "textStyle": {"alignmentX": "center", "alignmentY": "center", "fontSize": 13},
-                           "filterOption": {"dataType": "Text", "fieldName": field_api, "objectName": sdo_api,
-                                            "selectionType": "single" if single else "multiple"},
+# ⚠️ TOGGLE FILTER WARNING: viewType "toggle" renders as blue pipe-separated text LINKS, not button-style toggles.
+# It looks like navigation, not a filter. Use "list" for text dimensions.
+# Only use toggle if you have confirmed it renders correctly in your org version.
+
+def dash_list_filter(name, label, field_api, sdo_api, sdm_name, sdm_id):
+    """
+    Dropdown list filter for text dimensions (RM Name, Segment, Status, etc.)
+    CONFIRMED WORKING PATTERN (from live UI GET):
+    - label is TOP-LEVEL widget field, NOT in parameters — this is what renders above the dropdown
+    - isLabelHidden: False + top-level label = field name shown above dropdown
+    - source must NOT include "type" — read-only in GET, causes JSON_PARSER_ERROR on POST
+    - widgetStyle: white bg, borderEdges: [], borderRadius: 8 — rounded card, no visible border lines
+    """
+    _FILTER_STYLE = {"backgroundColor": "#ffffff", "borderColor": "#cccccc",
+                     "borderEdges": [], "borderRadius": 8, "borderWidth": 1}
+    return {"actions": [], "name": name, "label": label, "type": "filter",
+            "source": {"id": sdm_id, "name": sdm_name},   # NO "type" field
+            "parameters": {"filterOption": {"dataType": "Text", "fieldName": field_api,
+                                            "objectName": sdo_api, "selectionType": "multiple"},
+                           "isLabelHidden": False,
                            "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
-                           "viewType": "toggle", "widgetStyle": FILTER_STYLE},
-            "source": {"id": sdm_id, "name": sdm_name}}
+                           "viewType": "list",
+                           "widgetStyle": _FILTER_STYLE}}
 
 def dash_text(name, text, bold=True, size="24px", color="#181818"):
     return {"actions": [], "name": name, "type": "text",
@@ -1701,55 +1755,12 @@ def dash_text(name, text, bold=True, size="24px", color="#181818"):
                            "receiveFilterSource": {"filterMode": "all", "widgetIds": []}}}
 
 def dash_container(name):
-    """Bordered background card. Position dash_text_inner + dash_viz_inner on top at the same grid coords."""
     return {"actions": [], "name": name, "type": "container",
             "parameters": {"widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderColor": _SLDS_BORDER,
                                            "borderEdges": ["all"], "borderRadius": _SLDS_RADIUS, "borderWidth": 1}}}
 
-def dash_text_inner(name, text, description="", desc_color="#706E6B"):
-    """Title + description for use INSIDE a dash_container card. White bg, no border."""
-    content = [{"attributes": {"bold": True, "color": "#032D60", "size": "14px"}, "insert": text, "rules": []},
-               {"insert": "\n", "rules": []}]
-    if description:
-        content += [{"attributes": {"color": desc_color, "size": "11px"}, "insert": description, "rules": []},
-                    {"insert": "\n", "rules": []}]
-    return {"actions": [], "name": name, "type": "text",
-            "parameters": {"conditionalFormattingRules": [],
-                           "content": content,
-                           "widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderEdges": []},
-                           "receiveFilterSource": {"filterMode": "all", "widgetIds": []}}}
-
-def dash_viz_inner(name, viz_api_name, viz_id, legend_position="Bottom"):
-    """Viz for use INSIDE a dash_container card. No border — container provides the border."""
-    return {"actions": [], "name": name, "type": "visualization",
-            "parameters": {"legendPosition": legend_position,
-                           "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
-                           "widgetStyle": {"backgroundColor": _SLDS_SURFACE, "borderEdges": []}},
-            "source": {"id": viz_id, "name": viz_api_name}}
-
 def dash_pos(name, col, row, colspan, rowspan):
     return {"name": name, "column": col, "row": row, "colspan": colspan, "rowspan": rowspan}
-
-# ── UNIFIED CARD PATTERN (title + description + viz as one card) ───────────────
-# Use dash_container + dash_text_inner + dash_viz_inner at overlapping positions.
-# Container spans ALL rows of the card. Text takes the top N rows. Viz takes the rest.
-# Example (cols 2–46, rows 10–22, 13 rows total):
-#
-#   widgets["container_trend"] = dash_container("container_trend")
-#   page_cells.append(dash_pos("container_trend", 2, 10, 45, 13))  # full card
-#
-#   widgets["label_trend"] = dash_text_inner("label_trend", "Balance Trend",
-#       description="Aggregate deposit balance over time...")
-#   page_cells.append(dash_pos("label_trend", 2, 10, 45, 3))       # top 3 rows
-#
-#   widgets["viz_1"] = dash_viz_inner("viz_1", viz_api, viz_id)
-#   page_cells.append(dash_pos("viz_1", 2, 13, 45, 10))            # bottom 10 rows
-#
-# ── OUTER MARGIN RULE ──────────────────────────────────────────────────────────
-# With columnCount=72: reserve col 1 and col 72 as empty gutters. Run all content
-# through cols 2–71. A full-width widget at cols 1–72 renders edge-to-edge (no
-# outer margin) while multi-widget rows get cellSpacing gaps — misaligned appearance.
-# Recommended settings: columnCount=72, rowHeight=16, cellSpacingX=16, cellSpacingY=16
 
 
 # Build dashboard
@@ -1825,6 +1836,146 @@ else:
 
 ---
 
+## STEP N — Multi-Page Dashboard + Button Navigation (CONFIRMED WORKING)
+
+Use this pattern when the demo needs multiple pages (e.g. Alert Queue / Revenue Risk / Engagement).
+
+```python
+import uuid
+
+# Pre-generate page UUIDs — buttons must reference them before pages are built
+PAGE_KEYS   = ["queue", "revenue", "engagement"]
+PAGE_UUIDS  = {k: str(uuid.uuid4()) for k in PAGE_KEYS}
+PAGE_LABELS = {"queue": "Alert Queue", "revenue": "Revenue Risk", "engagement": "Engagement"}
+
+widgets    = {}
+page_cells = {k: [] for k in PAGE_KEYS}
+
+# ── Button widget — underline tab pattern ────────────────────────
+_BG   = "#F4F6F9"
+BLUE  = "#4992FE"
+
+def w_button(wname, text, target_uuid, active=False):
+    """Nav button. Active: blue text + blue bottom border. Inactive: gray text, no border."""
+    btn_style = (
+        {"backgroundColor": _BG, "borderColor": BLUE, "borderEdges": ["bottom"],
+         "borderRadius": 0, "borderWidth": 3, "fontColor": BLUE, "textStyle": ["bold"]}
+        if active else
+        {"backgroundColor": _BG, "borderColor": _BG, "borderEdges": [],
+         "borderRadius": 0, "borderWidth": 0, "fontColor": "#64748B", "textStyle": []}
+    )
+    return {
+        "actions": [{"actionType": "navigate", "eventType": "click",
+                     "parameters": {"destination": {"target": target_uuid, "type": "page"}}}],
+        "name": wname, "type": "button",
+        "parameters": {"alignmentX": "center", "alignmentY": "center",
+                       "fontSize": 12, "text": text, "widgetStyle": btn_style},
+    }
+
+# ── Chart card helper ─────────────────────────────────────────────
+CARD  = {"backgroundColor": "#FFFFFF", "borderColor": "#DDDBDA",
+         "borderEdges": ["all"], "borderRadius": 8, "borderWidth": 1}
+FLAT  = {"backgroundColor": "#FFFFFF", "borderColor": "#FFFFFF",
+         "borderEdges": [], "borderRadius": 0, "borderWidth": 0}
+
+def w_container(wname):
+    return {"actions": [], "name": wname, "type": "container",
+            "parameters": {"widgetStyle": CARD}}
+
+def w_title_desc(wname, title, desc):
+    return {"actions": [], "name": wname, "type": "text",
+            "parameters": {"conditionalFormattingRules": [],
+                "content": [
+                    {"attributes": {"bold": True, "color": "#1E293B", "size": "13px"},
+                     "insert": title, "rules": []},
+                    {"insert": "\n", "rules": []},
+                    {"attributes": {"bold": False, "color": "#64748B", "size": "11px"},
+                     "insert": desc, "rules": []},
+                    {"insert": "\n", "rules": []},
+                ],
+                "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
+                "widgetStyle": FLAT}}
+
+def chart_card(prefix, vresult, col, row, cs, rs, title, desc, target_cells, header_rows=3):
+    """Container + title/desc text + viz. Container renders behind the overlapping widgets."""
+    c, h, v = f"{prefix}_c", f"{prefix}_h", f"{prefix}_v"
+    vapi = vresult.get("apiName") or vresult.get("name")
+    widgets[c] = w_container(c)
+    widgets[h] = w_title_desc(h, title, desc)
+    widgets[v] = {"actions": [], "name": v, "type": "visualization",
+                  "parameters": {"receiveFilterSource": {"filterMode": "all", "widgetIds": []},
+                                 "widgetStyle": FLAT},
+                  "source": {"id": vresult["id"], "name": vapi}}
+    target_cells.append(pos(c, col, row, cs, rs))
+    target_cells.append(pos(h, col, row, cs, header_rows))
+    target_cells.append(pos(v, col, row + header_rows, cs, rs - header_rows))
+
+# ── Per-page layout ───────────────────────────────────────────────
+ROW_TITLE   = 1   # row 0 = top padding
+ROW_FILTERS = 3
+ROW_NAV     = 5
+ROW_KPI     = 7
+ROW_BODY    = 13
+
+for page in PAGE_KEYS:
+    pc = page_cells[page]
+
+    # Title
+    widgets[f"{page}_title"] = {"actions": [], "name": f"{page}_title", "type": "text",
+        "parameters": {"conditionalFormattingRules": [],
+            "content": [{"attributes": {"bold": True, "color": "#0B1F3A", "size": "20px"},
+                         "insert": "Dashboard Title Here", "rules": []}, {"insert": "\n", "rules": []}],
+            "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
+            "widgetStyle": {"backgroundColor": _BG, "borderEdges": [], "borderRadius": 0, "borderWidth": 0}}}
+    pc.append({"name": f"{page}_title", "column": 0, "row": ROW_TITLE, "colspan": 36, "rowspan": 2})
+
+    # Filter row — white card container + labeled list filters
+    _FSTYLE = {"backgroundColor": "#ffffff", "borderColor": "#cccccc",
+               "borderEdges": [], "borderRadius": 8, "borderWidth": 1}
+    widgets[f"{page}_fcon"] = w_container(f"{page}_fcon")
+    pc.append({"name": f"{page}_fcon", "column": 0, "row": ROW_FILTERS, "colspan": 15, "rowspan": 2})
+    widgets[f"{page}_flbl"] = {"actions": [], "name": f"{page}_flbl", "type": "text",
+        "parameters": {"conditionalFormattingRules": [],
+            "content": [{"attributes": {"bold": True, "color": "#64748B", "size": "14px"},
+                         "insert": "Filters", "rules": []}, {"insert": "\n", "rules": []}],
+            "receiveFilterSource": {"filterMode": "all", "widgetIds": []},
+            "widgetStyle": FLAT}}
+    pc.append({"name": f"{page}_flbl", "column": 0, "row": ROW_FILTERS, "colspan": 3, "rowspan": 1})
+    # Add filter widgets using dash_list_filter() — positions col 3 (cs=6) and col 9 (cs=6)
+
+    # Nav bar — 3 tabs, 12 cols each
+    for j, nav_key in enumerate(PAGE_KEYS):
+        wname = f"{page}_btn_{nav_key}"
+        widgets[wname] = w_button(wname, PAGE_LABELS[nav_key],
+                                  PAGE_UUIDS[nav_key], active=(nav_key == page))
+        pc.append({"name": wname, "column": j * 12, "row": ROW_NAV, "colspan": 12, "rowspan": 2})
+
+# ── Dashboard payload — multi-page ───────────────────────────────
+dash_payload = {
+    "name": DASH_NAME, "label": "Dashboard Label",
+    "description": "One-sentence description.",
+    "workspaceIdOrApiName": WORKSPACE_NAME,
+    "style": {"widgetStyle": {"backgroundColor": _BG, "borderEdges": [], "borderRadius": 0, "borderWidth": 0}},
+    "widgets": widgets,   # flat dict — all pages share one namespace
+    "layouts": [{
+        "name": "default", "columnCount": 36, "rowHeight": 24, "maxWidth": 1440,
+        "pages": [
+            {"name": PAGE_UUIDS[k], "label": PAGE_LABELS[k], "widgets": page_cells[k]}
+            for k in PAGE_KEYS
+        ],
+        "style": {"backgroundColor": _BG, "cellSpacingX": 8, "cellSpacingY": 8, "gutterColor": _BG},
+    }],
+}
+```
+
+**Multi-page gotchas:**
+- Widget names must be unique across ALL pages — prefix with page key (e.g. `queue_title`, `revenue_title`)
+- `widgets` dict is flat — all pages share it
+- Page `name` MUST be a UUID — pre-generate with `uuid.uuid4()` before building buttons that reference them
+- Buttons reference page UUIDs via `"destination": {"target": page_uuid, "type": "page"}`
+
+---
+
 ## STEP 8 — FULL CODE: Demo Guide
 
 ```python
@@ -1857,8 +2008,8 @@ def build_demo_guide(bank_name, use_case, persona, story, signal_onset_months,
 
 1. **Run the script** (if not already done): `python3 {script_name}`
 2. **Enable Analytics Agent Readiness**: Data 360 → Semantic Model → **{sdm_name}** → Settings → Analytics Agent Readiness → toggle ON
-3. **Business Preferences** are applied automatically by the script. To add custom preferences: Data 360 → Semantic Model → {sdm_name} → Business Preferences
-4. **Seed Q&A Calibration**: Data 360 → Semantic Model → {sdm_name} → Q&A Calibration → add questions below as Verified Questions (see Q&A Calibration Guide at end of skill file)
+3. **Add Business Preferences**: Data 360 → Semantic Model → {sdm_name} → Business Preferences (use template in skill file)
+4. **Seed Q&A Calibration**: Data 360 → Semantic Model → {sdm_name} → Q&A Calibration → add questions below as Verified Questions
 
 ---
 
@@ -1910,7 +2061,16 @@ Workspace: {workspace_name}
 
 ---
 
-## ALL COMMON PITFALLS (57 items)
+## ALL COMMON PITFALLS (61 items)
+
+**New — Dashboard / Viz (confirmed from live builds):**
+
+58. **Filter `label` is a top-level widget field, NOT in `parameters`** — setting it + `isLabelHidden: False` renders the field name above the dropdown. Missing top-level `label` = unlabeled filter.
+59. **Filter `source` must NOT include `"type"` on POST** — `"type": "SemanticModel"` appears in GET responses but causes `JSON_PARSER_ERROR` on POST. Omit it.
+60. **`viewType: "toggle"` renders as blue pipe-separated text links, not button toggles** — looks like navigation, not a filter. Always use `"list"` for text dimensions.
+61. **Sort order (`viewSpecification.sortOrders.fields`) works for bar/line but NOT Table mode** — Table mode returns "Field sort is only allowed for visualizations." The prior note in this file was wrong.
+
+---
 
 1. **Do not use the SF access token for Data Cloud API calls** — always complete the second token exchange at `/services/a360/token`.
 2. **Do not leave field descriptions blank** — Concierge quality degrades sharply with undescribed fields.
@@ -1946,7 +2106,7 @@ Workspace: {workspace_name}
 32. **`style.headers` must be omitted, not `{}`** — empty dict causes `JSON_PARSER_ERROR`.
 33. **`allHeaders.fields` is required for dimension fields on the rows shelf** — omitting causes `INVALID_VISUALIZATION_METADATA`.
 34. **`mode` must be `"Visualization"` for charts** — not `"Normal"`, not `"Table"`.
-35. **Sorting bar charts by measure is not supported via API** — `sortOrders` only works when `mode="Table"`.
+35. **Sorting bar/line charts by measure IS supported** — use `viewSpecification.sortOrders.fields` with `type: "Field"` and `byField` pointing to the measure key. Table mode does NOT support this — "Field sort is only allowed for visualizations".
 36. **`"UserAgg"` causes `ROW_LEVEL_CALC_AGG_VALIDATION_ERROR`** for row-level calcs — use `"Sum"` or `"Avg"` to match SDM `aggregationType`.
 37. **Dashboard `widgets` is a dict, not a list** — sending an array causes 500 error.
 38. **Dashboard `style` uses `widgetStyle`** — not `"canvas"`.
@@ -1974,9 +2134,7 @@ Workspace: {workspace_name}
 
 ## Q&A CALIBRATION GUIDE
 
-*(Referenced in demo guide "Before You Demo" step 4. Show for data/IT/analytics audiences — not executives.)*
-
-Q&A Calibration is a self-serve tool that lets data experts test and improve Concierge answer accuracy.
+Q&A Calibration is a self-serve tool that lets data experts test and improve Concierge answer accuracy. Show it for data/IT/analytics audiences — not executives.
 
 **What it does:**
 - **Questions Bank** — library of test questions with statuses: New, Inaccurate, Verified, Regression

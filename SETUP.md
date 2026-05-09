@@ -1,4 +1,4 @@
-# Tableau Next Demo Builder — Peer Setup Guide
+# Tableau Next Demo Builder — Setup Guide
 
 This guide gets you from zero to running your first demo in about 30 minutes.
 
@@ -89,9 +89,9 @@ The scripts need a connector in Data Cloud to ingest synthetic data.
 
 1. Copy the template:
    ```bash
-   cp next_config.template.json next_config.json
+   cp next_orgs.template.json next_orgs.json
    ```
-2. Edit `next_config.json` with your values:
+2. Edit `next_orgs.json` with your values:
    ```json
    {
      "sf_login_url": "https://login.salesforce.com",
@@ -106,7 +106,7 @@ The scripts need a connector in Data Cloud to ingest synthetic data.
    ```
 3. The `connector_sf_id` and `connector_uuid_name` fields start empty — the script fills them in automatically on the first run and saves them back to the file.
 
-> **IMPORTANT:** Never share or commit `next_config.json`. It contains your credentials. The `.template.json` file is safe to share.
+> **IMPORTANT:** Never share or commit `next_orgs.json`. It contains your credentials. The `.template.json` file is safe to share.
 
 ---
 
@@ -127,8 +127,8 @@ Open Claude Code in this project folder and type:
 ```
 
 Claude will ask you for:
-- Bank / company name
-- Target persona (e.g., Commercial Banking RM, Wealth Advisor)
+- Company / prospect name (e.g., "Acme Corp")
+- Target persona (e.g., "VP of Sales", "Head of Customer Success")
 - Story (what's declining, what's rising, what's the business problem)
 
 Reply **go** when the plan looks right. The script runs automatically — total time is 8–15 minutes. You'll get a Mac notification when it's done.
@@ -139,7 +139,7 @@ Reply **go** when the plan looks right. The script runs automatically — total 
 
 | Problem | Fix |
 |---|---|
-| `Authentication failed` | Check `client_id`, `client_secret`, and `refresh_token` in `next_config.json` |
+| `Authentication failed` | Check `client_id`, `client_secret`, and `refresh_token` in `next_orgs.json` |
 | `connector_sf_id not found` | Make sure the connector is named exactly `tableau_next_demo` in Data Cloud Setup |
 | `DLO ACTIVE timeout` | The org may be slow — re-run the script; it's idempotent |
 | `409 Conflict on bulk job` | A previous job is still running — wait 5 min and re-run |
@@ -159,10 +159,9 @@ Each `/build-next-demo` run creates:
 | Semantic Data Model | Data 360 → Semantic Models |
 | 4 Visualizations | Tableau Next → Visualizations |
 | Dashboard | Tableau Next → Dashboards |
-| Demo guide (Markdown) | Project folder → `{bank}_{use_case}_demo_guide.md` |
+| Demo guide (Markdown) | Project folder → `{company_slug}_{use_case}_demo_guide.md` |
 
 To tear down a demo environment: `python3 next_teardown.py`
 
 ---
 
-*Questions? Ask in the SE Demo Tools Slack channel.*
