@@ -152,6 +152,14 @@
 
     .hero-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; opacity:0; animation:fadeUp 0.8s ease 1.1s forwards; }
 
+    /* ── SCROLL INDICATOR ── */
+    .scroll-cue { position:absolute; bottom:36px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:6px; opacity:0; animation:fadeUp 0.8s ease 1.6s forwards; text-decoration:none; z-index:4; }
+    .scroll-cue-label { font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+    .scroll-cue-chevron { width:20px; height:20px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(45deg); animation:chevronBounce 1.6s ease-in-out 2s infinite; }
+    @keyframes chevronBounce { 0%,100%{transform:rotate(45deg) translateY(0);opacity:0.5} 50%{transform:rotate(45deg) translateY(5px);opacity:1} }
+    .scroll-cue:hover .scroll-cue-label { color:var(--text); }
+    .scroll-cue:hover .scroll-cue-chevron { border-color:var(--text); }
+
     .btn-primary { display:inline-flex; align-items:center; gap:8px; background:var(--text); color:var(--bg); font-weight:700; font-size:15px; padding:14px 28px; border-radius:10px; text-decoration:none; transition:opacity 0.15s,transform 0.15s,box-shadow 0.15s; }
     .btn-primary:hover { opacity:0.92; transform:translateY(-1px); box-shadow:0 8px 32px rgba(99,102,241,0.3); }
     .btn-secondary { display:inline-flex; align-items:center; gap:8px; background:transparent; color:var(--muted); font-weight:600; font-size:15px; padding:14px 28px; border-radius:10px; border:1px solid var(--border); text-decoration:none; transition:color 0.15s,border-color 0.15s,background 0.15s; }
@@ -373,12 +381,16 @@
       <a href="#how-it-works" class="btn-secondary">See how it works →</a>
     </div>
   </div>
+  <a href="#problem" class="scroll-cue" aria-label="Scroll down">
+    <span class="scroll-cue-label">Scroll</span>
+    <span class="scroll-cue-chevron"></span>
+  </a>
 </div>
 
 <div class="section-divider"></div>
 
 <!-- THE PROBLEM -->
-<section>
+<section id="problem">
   <div class="container">
     <div class="section-eyebrow reveal">The problem</div>
     <h2 class="reveal reveal-delay-1">Building a Tableau Next demo<br>used to take weeks.</h2>
