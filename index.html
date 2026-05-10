@@ -51,27 +51,43 @@
     [data-theme="light"] .t-note { color: #64748B; }
     [data-theme="light"] footer { border-top-color: var(--border); }
 
-    /* ── THEME TOGGLE ── */
-    .theme-toggle {
+    /* ── NAV ── */
+    nav {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 0; left: 0; right: 0;
+      height: 64px;
       z-index: 100;
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.07);
-      backdrop-filter: blur(12px);
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 17px;
-      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      background: rgba(8,8,8,0.75);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
     }
 
-    .theme-toggle:hover { background: rgba(255,255,255,0.13); border-color: var(--border-hover); transform: scale(1.08); }
+    [data-theme="light"] nav { background: rgba(248,250,252,0.85); }
 
-    [data-theme="light"] .theme-toggle { background: rgba(0,0,0,0.05); }
-    [data-theme="light"] .theme-toggle:hover { background: rgba(0,0,0,0.1); }
+    .nav-logo { font-size:16px; font-weight:800; color:var(--text); text-decoration:none; letter-spacing:-0.03em; margin-right:auto; }
+    .nav-logo span { color: var(--indigo); }
+    .nav-back { font-size:13px; font-weight:500; color:var(--muted); text-decoration:none; display:flex; align-items:center; gap:6px; transition:color 0.2s; }
+    .nav-back:hover { color: var(--text); }
+
+    /* ── THEME TOGGLE ── */
+    .theme-toggle {
+      margin-left: 24px;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .theme-toggle:hover { background: var(--surface-hover); border-color: var(--border-hover); }
+    [data-theme="light"] .theme-toggle { background: var(--surface); }
+    [data-theme="light"] .theme-toggle:hover { background: var(--surface-hover); }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -97,7 +113,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 80px 24px 120px;
+      padding: calc(64px + 80px) 24px 120px;
       text-align: center;
       overflow: hidden;
     }
@@ -357,7 +373,11 @@
 </head>
 <body>
 
-<button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">🌙</button>
+<nav>
+  <a href="https://andyrapaport.com" class="nav-logo">Andy<span>.</span></a>
+  <a href="https://andyrapaport.com" class="nav-back">← andyrapaport.com</a>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">🌙</button>
+</nav>
 
 <!-- HERO -->
 <div class="hero">
